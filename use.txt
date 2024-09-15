@@ -1,0 +1,12 @@
+// python commands to activate virtual environment
+.\venv\Scripts\activate  
+
+
+
+//Generate requirements file
+pip freeze > requirements.txt
+
+
+
+// Install 
+pip install -r requirements.txt
