@@ -60,5 +60,11 @@ def logout(request):
 
 
 @api_view(['GET'])
+def getUsers(request):
+    users = CustomUser.objects.all()
+    serializer = CustomUserSerializer(users, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET'])
 def test_token(request):
     return Response({})
