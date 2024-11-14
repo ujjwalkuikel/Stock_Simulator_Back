@@ -4,16 +4,19 @@ from .models import CustomUser
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from django.db.utils import IntegrityError
-from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate
+from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
+from django.contrib.auth import authenticate, get_user_model
 
 from portfolio.models import Portfolio
 import logging
 
 # Set up logging
 logger = logging.getLogger(__name__)
+
+User = get_user_model()
 
 @api_view(['POST'])
 def login(request):
@@ -133,10 +136,30 @@ def getUsers(request):
         logger.error(f"Error fetching users: {str(e)}")
         return Response({"detail": "An error occurred while fetching users."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@api_view(['GET'])
-def test_token(request):
+
+@api_view(['POST'])
+def validateUser(request):
+    token = request.data.get('token')
+    if not token:
+        return Response({"detail": "Token is required."}, status=status.HTTP_400_BAD_REQUEST)
+    
     try:
-        return Response({}, status=status.HTTP_200_OK)
+        # Decode token to check validity
+        access_token = AccessToken(token)
+        user_id = access_token['user_id']
+        user = User.objects.get(id=user_id)
+
+        # If the token is valid, return user info
+        return Response({"status": "success",
+                         "user": {
+                             "id": user.id,
+                             "email": user.email,
+                             "name": f"{user.first_name} {user.last_name}"
+                         }}, status=status.HTTP_200_OK)
+    
+    except User.DoesNotExist:
+        return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
     except Exception as e:
-        logger.error(f"Error in test_token: {str(e)}")
-        return Response({"detail": "An error occurred during the token test."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"detail" : "Invalid or expired token"},  status=status.HTTP_401_UNAUTHORIZED)
+
