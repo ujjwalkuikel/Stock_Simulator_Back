@@ -40,7 +40,10 @@ def login(request):
             return Response({
                 "status": "success",
                 "statusCode": 200,
-                "token": str(refresh.access_token),
+                "tokens" : {
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh)
+                },
                 "user": {
                     "name": f"{user.first_name} {user.last_name}",
                     "email": user.email
