@@ -40,10 +40,7 @@ def login(request):
             return Response({
                 "status": "success",
                 "statusCode": 200,
-                "tokens" : {
-                    "access": str(refresh.access_token),
-                    "refresh": str(refresh)
-                },
+                "token": str(refresh.access_token),
                 "user": {
                     "name": f"{user.first_name} {user.last_name}",
                     "email": user.email
@@ -53,15 +50,23 @@ def login(request):
             # Log a warning if authentication fails
             logger.warning(f"Login failed for email: {email}")
             return Response(
-                {"status": "error", "statusCode": 401, "message": "Invalid credentials"},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-        
+            {
+                "status": "error",
+                "statusCode": 401, # client's authentication credentials were invalid
+                "message": "Invalid credentials",
+                "errors": None  # Explicitly state no additional errors
+            },
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+                
     except Exception as e:
         # Catch and log any unexpected errors during login
         logger.error(f"Error during login: {str(e)}")
         return Response(
-            {"status": "error", "statusCode": 500, "message": "An error occurred during login."},
+            {"status": "error", 
+             "statusCode": 500, 
+             "message": "An error occurred during login."
+             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 @api_view(['POST'])
@@ -83,7 +88,7 @@ def signup(request):
                 "status": "success",
                 "statusCode": 201,
                 "message": "User successfully registered",
-                "token:": str(refresh.access_token),
+                "token": str(refresh.access_token),
                 "user": {
                     "name": f"{user.first_name} {user.last_name}",
                     "email": user.email
