@@ -1,13 +1,11 @@
 # users/views.py
 from .serializers import CustomUserSerializer
 from .models import CustomUser
-from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from django.db.utils import IntegrityError
-from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
+from rest_framework.decorators import api_view
+from rest_framework_simplejwt.tokens import AccessToken
 from django.contrib.auth import authenticate, get_user_model
 
 from portfolio.models import Portfolio
@@ -36,11 +34,11 @@ def login(request):
         logger.info(f"Authenticated user: {user}")
 
         if user is not None:
-            refresh = RefreshToken.for_user(user)
+            accessToken = AccessToken.for_user(user)
             return Response({
                 "status": "success",
                 "statusCode": 200,
-                "token": str(refresh.access_token),
+                "token": str(accessToken),
                 "user": {
                     "name": f"{user.first_name} {user.last_name}",
                     "email": user.email
@@ -75,7 +73,7 @@ def signup(request):
         serializer = CustomUserSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            refresh = RefreshToken.for_user(user)
+            accessToken = AccessToken.for_user(user)
 
             # Initialize a portfolio for the new user
             Portfolio.objects.create(
@@ -88,7 +86,7 @@ def signup(request):
                 "status": "success",
                 "statusCode": 201,
                 "message": "User successfully registered",
-                "token": str(refresh.access_token),
+                "token": str(accessToken),
                 "user": {
                     "name": f"{user.first_name} {user.last_name}",
                     "email": user.email
@@ -118,21 +116,74 @@ def signup(request):
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
 @api_view(['POST'])
 def logout(request):
     try:
-        refresh_token = request.data.get('refresh')
-        if not refresh_token:
-            return Response({"detail": "Refresh token is required."}, status=status.HTTP_400_BAD_REQUEST)
+        # Retrieve token from Authorization header
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return Response(
+                {
+                    "status": "error",
+                    "statusCode": 400,
+                    "message": "Authorization token is missing or malformed."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        token = RefreshToken(refresh_token)
-        token.blacklist()
+        token_str = auth_header.split(' ')[1]  # Extract token after "Bearer"
+        try:
+            token = AccessToken(token_str)  # Decode token to validate
+            user_id = token['user_id']  # Extract the user_id from the token payload
 
-        return Response({"detail": "Logout successful"}, status=status.HTTP_205_RESET_CONTENT)
+            # Optional: Ensure the token matches an active user in the system
+            User = get_user_model()
+            user = User.objects.filter(id=user_id).first()
+            if not user:
+                return Response(
+                    {
+                        "status": "error",
+                        "statusCode": 401,
+                        "message": "Invalid token or user no longer exists."
+                    },
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+
+            # Optional: Blacklist the token if using token blacklisting (for refresh tokens only)
+            # token.blacklist()
+
+            logger.info(f"User {user.email} logged out successfully.")
+            return Response(
+                {
+                    "status": "success",
+                    "statusCode": 200,
+                    "message": "Logout successful."
+                },
+                status=status.HTTP_200_OK
+            )
+        except TokenError:
+            logger.warning("Invalid or expired token used for logout.")
+            return Response(
+                {
+                    "status": "error",
+                    "statusCode": 401,
+                    "message": "Invalid or expired token."
+                },
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 
     except Exception as e:
         logger.error(f"Error during logout: {str(e)}")
-        return Response({"detail": "An error occurred during logout."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {
+                "status": "error",
+                "statusCode": 500,
+                "message": "An error occurred during logout."
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 
 @api_view(['GET'])
 def getUsers(request):
