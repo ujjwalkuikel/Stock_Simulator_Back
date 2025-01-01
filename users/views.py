@@ -100,7 +100,7 @@ def signup(request):
                 {
                     "status": "error",
                     "statusCode": 400,
-                    "message": "Invalid data provided.",
+                    "message": serializer.errors["non_field_errors"][0],
                     "errors": serializer.errors
                 },
                 status=status.HTTP_400_BAD_REQUEST
