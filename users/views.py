@@ -71,6 +71,7 @@ def login(request):
 def signup(request):
     try:
         serializer = CustomUserSerializer(data=request.data)
+        print(request.data)
         if serializer.is_valid():
             user = serializer.save()
             accessToken = AccessToken.for_user(user)
@@ -81,6 +82,8 @@ def signup(request):
                 total_value=10000,  # Initial total value
                 invested_value=0.00  # Initial invested value
             )
+
+            print("User: ", user)
 
             return Response({
                 "status": "success",
@@ -108,11 +111,15 @@ def signup(request):
     except Exception as e:
         # Log any unexpected errors during signup
         logger.error(f"Error during signup: {str(e)}")
+        if "password" in serializer.errors:
+            errorMessage = serializer.errors["password"]
+        if "email" in serializer.errors:
+            errorMessage = serializer.errors["email"]
         return Response(
             {
                 "status": "error",
                 "statusCode": 500,
-                "message": "An error occurred during signup."
+                "message": errorMessage[0]
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
